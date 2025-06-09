@@ -18,21 +18,22 @@ const User = mongoose.model('User', new mongoose.Schema({
   emri: String,
   email: String,
   fjalekalimi: String,
+  role: { type: String, default: 'user' }, // default: user
 }));
 
 app.post('/register', async (req, res) => {
-  const { emri, email, fjalekalimi } = req.body;
+  const { emri, email, fjalekalimi, role } = req.body;
   try {
     const ekziston = await User.findOne({ email });
     if (ekziston) {
       return res.status(400).json({ message: 'Emaili ekziston' });
     }
 
-    const user = new User({ emri, email, fjalekalimi });
+    const user = new User({ emri, email, fjalekalimi, role });
     await user.save();
-    res.status(201).json({ message: 'Përdoruesi u regjistrua' });
+    res.status(201).json({ message: 'Përdoruesi u regjistrua me sukses' });
   } catch (err) {
-    res.status(500).json({ message: 'Gabim', error: err });
+    res.status(500).json({ message: 'Gabim në server', error: err });
   }
 });
 
@@ -41,14 +42,50 @@ app.post('/login', async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Email nuk ekziston' });
-    if (user.fjalekalimi !== fjalekalimi) return res.status(401).json({ message: 'Fjalëkalim i gabuar' });
 
-    res.json({ message: 'Kyçja me sukses', user: { emri: user.emri, email: user.email } });
+    if (user.fjalekalimi !== fjalekalimi) {
+      return res.status(401).json({ message: 'Fjalëkalim i gabuar' });
+    }
+
+    res.json({
+      message: 'Kyçja me sukses',
+      user: {
+        emri: user.emri,
+        email: user.email,
+        role: user.role
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: 'Gabim në server', error: err });
   }
 });
 
+// GET all users
+app.get('/users', async (req, res) => {
+  const users = await User.find();
+  res.json(users);
+});
+
+// POST add user
+app.post('/users', async (req, res) => {
+  const { emri, email, fjalekalimi, role } = req.body;
+  const user = new User({ emri, email, fjalekalimi, role });
+  await user.save();
+  res.status(201).json({ message: 'U shtua me sukses' });
+});
+
+// PUT update user
+app.put('/users/:id', async (req, res) => {
+  const { emri, email, fjalekalimi, role } = req.body;
+  await User.findByIdAndUpdate(req.params.id, { emri, email, fjalekalimi, role });
+  res.json({ message: 'U përditësua' });
+});
+
+// DELETE user
+app.delete('/users/:id', async (req, res) => {
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ message: 'U fshi me sukses' });
+});
 // Model Job
 const jobSchema = new mongoose.Schema({
   title: String,
@@ -143,6 +180,46 @@ app.get("/api/contact", async (req, res) => {
   } catch (error) {
     console.error("Error fetching contacts:", error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+const applicationSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  message: { type: String, required: true },
+  jobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Application = mongoose.model("Application", applicationSchema);
+
+// Routes
+
+// POST - krijo aplikim të ri
+app.post("/api/applications", async (req, res) => {
+  const { name, email, message, jobId } = req.body;
+
+  if (!name || !email || !message || !jobId) {
+    return res.status(400).json({ error: "Të gjitha fushat janë të detyrueshme." });
+  }
+
+  try {
+    const application = new Application({ name, email, message, jobId });
+    await application.save();
+    res.status(201).json({ message: "Aplikimi u dërgua me sukses." });
+  } catch (error) {
+    console.error("Gabim:", error);
+    res.status(500).json({ error: "Gabim i serverit." });
+  }
+});
+
+// GET - merr të gjitha aplikimet
+app.get("/api/applications", async (req, res) => {
+  try {
+    const applications = await Application.find().populate("jobId");
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ error: "Gabim në server." });
   }
 });
 
