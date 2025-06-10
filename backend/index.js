@@ -145,43 +145,11 @@ app.delete("/api/jobs/:id", async (req, res) => {
   }
 });
 
-// Contact Schema & Model
-const contactSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true },
-  email: { type: String, required: true, trim: true },
-  message: { type: String, required: true, trim: true },
-  createdAt: { type: Date, default: Date.now },
-});
 
-const Contact = mongoose.model("Contact", contactSchema);
 
-// POST /api/contact - save contact form data
-app.post("/api/contact", async (req, res) => {
-  try {
-    const { name, email, message } = req.body;
-    if (!name || !email || !message) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
 
-    const newContact = new Contact({ name, email, message });
-    await newContact.save();
-    res.status(201).json({ message: "Contact saved successfully" });
-  } catch (error) {
-    console.error("Error saving contact:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 
-// GET /api/contact - merr të gjitha mesazhet
-app.get("/api/contact", async (req, res) => {
-  try {
-    const messages = await Contact.find().sort({ createdAt: -1 }); // mesazhet më të reja në krye
-    res.json(messages);
-  } catch (error) {
-    console.error("Error fetching contacts:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+
 
 const applicationSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -222,7 +190,77 @@ app.get("/api/applications", async (req, res) => {
     res.status(500).json({ error: "Gabim në server." });
   }
 });
+// GET /api/applications/:email
+app.get("/applications/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const applications = await Application.find({ email }).populate("jobId");
+    const formatted = applications.map(app => ({
+      ...app._doc,
+      job: app.jobId,
+    }));
+    res.json(formatted);
+  } catch (err) {
+    res.status(500).json({ error: "Gabim në server" });
+  }
+});
+app.get("/api/jobs/:jobId/applicants", async (req, res) => {
+  try {
+    const applicants = await Application.find({ jobId: req.params.jobId });
+    res.json(applicants);
+  } catch (err) {
+    res.status(500).json({ error: "Gabim gjatë marrjes së aplikantëve" });
+  }
+});
+
+// Optional endpoint për shtim të aplikantit (nëse e përdor ende)
+app.post("/api/applicants", async (req, res) => {
+  try {
+    const application = new Application(req.body);
+    await application.save();
+    res.status(201).json(application);
+  } catch (err) {
+    res.status(500).json({ error: "Gabim gjatë shtimit të aplikantit" });
+  }
+});
 
 
+
+const contactSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, trim: true },
+  message: { type: String, required: true, trim: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Contact = mongoose.model("Contact", contactSchema);
+
+// POST /api/contact - save contact form data
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const newContact = new Contact({ name, email, message });
+    await newContact.save();
+    res.status(201).json({ message: "Contact saved successfully" });
+  } catch (error) {
+    console.error("Error saving contact:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /api/contact - merr të gjitha mesazhet
+app.get("/api/contact", async (req, res) => {
+  try {
+    const messages = await Contact.find().sort({ createdAt: -1 }); // mesazhet më të reja në krye
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching contacts:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Serveri u nis në portin ${PORT}`));
